@@ -21,20 +21,27 @@ import java.util.Collections;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Autowired
-    private JwtUtil jwtutil;
-
+    private JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
         String jwt = extractJwtToken(request);
-        String username = jwtutil.getUsernameFromToken(jwt);
 
-        if(shouldProcessAuthentication(username)){
-            processAuthentication(request, jwt, username);
-
+        // Guard: if no token present, skip authentication and continue filter chain
+        if (jwt == null) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        filterChain.doFilter(request,response);
+        String username = jwtUtil.getUsernameFromToken(jwt);
+
+        if (shouldProcessAuthentication(username)) {
+            processAuthentication(request, jwt, username);
+        }
+
+        filterChain.doFilter(request, response);
     }
 
 
@@ -57,14 +64,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void processAuthentication(HttpServletRequest request, String jwt, String username) {
-        if(jwtutil.validateToken(jwt)){
+        if(jwtUtil.validateToken(jwt)){
             UserDetails userDetails = createUserDetailsFromTOken(jwt, username);
             setAuthenticationInCOntext(request, userDetails);
         }
     }
 
     private UserDetails createUserDetailsFromTOken(String jwt, String username) {
-        String role = jwtutil.getRoleFromToken(jwt);
+        String role = jwtUtil.getRoleFromToken(jwt);
 
         return User.builder()
                 .username(username)

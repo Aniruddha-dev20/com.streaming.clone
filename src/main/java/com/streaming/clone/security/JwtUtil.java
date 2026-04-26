@@ -50,7 +50,7 @@ public class JwtUtil {
         return expiration.before(new Date());
     }
 
-    private String generateToken(String username, String role){
+    public String generateToken(String username, String role){
         Map<String, Object> claims = new HashMap<>();
         claims.put("role",role);
         return doGenerateToken(claims, username);
@@ -61,7 +61,7 @@ public class JwtUtil {
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY))
                 .signWith(getSigningKey())
                 .compact();
     }

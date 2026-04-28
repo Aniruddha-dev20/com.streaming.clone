@@ -1,5 +1,6 @@
 package com.streaming.clone.security;
 
+import jakarta.annotation.Nonnull;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,18 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtUtil jwtUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@Nonnull HttpServletRequest request, @Nonnull HttpServletResponse response, @Nonnull FilterChain filterChain)
             throws ServletException, IOException {
 
         String jwt = extractJwtToken(request);
 
-        // Guard: if no token present, skip authentication and continue filter chain
-        if (jwt == null) {
-            filterChain.doFilter(request, response);
-            return;
+        String username = null;
+        if(jwt != null) {
+            username = jwtUtil.getUsernameFromToken(jwt);
         }
-
-        String username = jwtUtil.getUsernameFromToken(jwt);
 
         if (shouldProcessAuthentication(username)) {
             processAuthentication(request, jwt, username);
@@ -65,12 +63,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void processAuthentication(HttpServletRequest request, String jwt, String username) {
         if(jwtUtil.validateToken(jwt)){
-            UserDetails userDetails = createUserDetailsFromTOken(jwt, username);
-            setAuthenticationInCOntext(request, userDetails);
+            UserDetails userDetails = createUserDetailsFromToken(jwt, username);
+            setAuthenticationInContext(request, userDetails);
         }
     }
 
-    private UserDetails createUserDetailsFromTOken(String jwt, String username) {
+    private UserDetails createUserDetailsFromToken(String jwt, String username) {
         String role = jwtUtil.getRoleFromToken(jwt);
 
         return User.builder()
@@ -80,7 +78,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .build();
     }
 
-    private void setAuthenticationInCOntext(HttpServletRequest request, UserDetails userDetails) {
+    private void setAuthenticationInContext(HttpServletRequest request, UserDetails userDetails) {
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null,
                 userDetails.getAuthorities());
         authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

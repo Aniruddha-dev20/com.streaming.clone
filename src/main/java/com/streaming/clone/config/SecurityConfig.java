@@ -20,6 +20,7 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/login",
             "/api/auth/signup",
@@ -30,41 +31,24 @@ public class SecurityConfig {
     };
 
     @Bean
-    public PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
+
         return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
-                .cors(cors -> {})
-                .authorizeHttpRequests(auth -> auth.requestMatchers
-                        (PUBLIC_ENDPOINTS).permitAll().anyRequest().authenticated())
+                .cors(cors -> {
+                })
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .anyRequest().authenticated())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

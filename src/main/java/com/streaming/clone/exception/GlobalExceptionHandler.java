@@ -69,7 +69,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailNotVerifiedException.class)
     public ResponseEntity<Map<String,Object>> handleEmailNotVerified(EmailNotVerifiedException ex){
-        log.warn("BadCredentialsException: {}",ex.getMessage(),ex);
+        log.warn("EmailNotVerifiedException: {}",ex.getMessage(),ex);
         return buildResponse(HttpStatus.FORBIDDEN,ex.getMessage());
     }
 
@@ -90,7 +90,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
     public void handleClientAbort(Exception ex){
-        log.debug("Client closed connection dusring streaming (expected for video seeking/buffering) : {}",ex.getMessage());
+        log.debug("Client closed connection during streaming (expected for video seeking/buffering) : {}",ex.getMessage());
 
     }
 

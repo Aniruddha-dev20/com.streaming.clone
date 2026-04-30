@@ -1,0 +1,184 @@
+package com.streaming.clone.serviceImpl;
+
+import com.streaming.clone.dao.UserRepository;
+import com.streaming.clone.dto.request.UserRequest;
+import com.streaming.clone.dto.response.MessageResponse;
+import com.streaming.clone.dto.response.PageResponse;
+import com.streaming.clone.dto.response.UserResponse;
+import com.streaming.clone.entity.User;
+import com.streaming.clone.enums.Role;
+import com.streaming.clone.exception.EmailAlreadyExistsException;
+import com.streaming.clone.exception.InvalidRoleException;
+import com.streaming.clone.service.EmailService;
+import com.streaming.clone.service.UserService;
+import com.streaming.clone.utils.PaginationUtils;
+import com.streaming.clone.utils.ServiceUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.UUID;
+
+@Service
+public class UserServiceImpl implements UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ServiceUtils serviceUtils;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Override
+    public MessageResponse createUser(UserRequest userRequest) {
+        if (userRepository.findByEmail(userRequest.getEmail()).isPresent()){
+            throw new EmailAlreadyExistsException("Email Already Exists.");
+        }
+
+        validateRole(userRequest.getRole());
+
+        User user = new User();
+        user.setEmail(userRequest.getEmail());
+        user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
+        user.setFullName(userRequest.getFullName());
+        user.setRole(Role.valueOf(userRequest.getRole().toUpperCase()));
+        user.setActive(true);
+        String verificationToken = UUID.randomUUID().toString();
+        user.setVerificationToken(verificationToken);
+        user.setVerificationTokenExpiry(Instant.now().plusSeconds(86400));
+        userRepository.save(user);
+        emailService.sendVerificationEmail(userRequest.getEmail(), verificationToken);
+        return new MessageResponse("User created successfully.");
+
+    }
+
+
+    private void validateRole(String role) {
+        if (Arrays.stream(Role.values()).noneMatch(r -> r.name().equalsIgnoreCase(role))){
+            throw new InvalidRoleException("Invalid Role: "+ role);
+        }
+    }
+
+    @Override
+    public MessageResponse updateUser(Long id, UserRequest userRequest) {
+        User user = serviceUtils.getUserByIdOrThrow(id);
+
+        ensureNotLastActiveAdmin(user);
+        validateRole(userRequest.getRole());
+
+        user.setFullName(userRequest.getFullName());
+        user.setRole(Role.valueOf(userRequest.getRole().toUpperCase()));
+        userRepository.save(user);
+        return new MessageResponse("User updated successfully.");
+    }
+
+    private void ensureNotLastActiveAdmin(User user) {
+        if (user.isActive() && user.getRole() == Role.ADMIN){
+            long activeAdminCount = userRepository.countByRoleAndActive(Role.ADMIN, true);
+            if (activeAdminCount <= 1){
+                throw new RuntimeException("Cannot deactivate the last active admin user.");
+            }
+        }
+    }
+
+    @Override
+    public PageResponse<UserResponse> geyAllUsers(int page, int size, String search) {
+        Pageable pageable = PaginationUtils.createPageRequest(page, size, "id");
+
+        Page<User> userPage;
+
+        if (search != null && !search.trim().isEmpty()){
+            userPage = userRepository.searchUsers(search.trim(), pageable);
+        }else {
+            userPage = userRepository.findAll(pageable);
+        }
+
+        return PaginationUtils.toPageResponse(userPage, UserResponse::fromEntity);
+
+        }
+
+    @Override
+    public MessageResponse deleteUser(Long id, String currentEmailUser) {
+        User user = serviceUtils.getUserByIdOrThrow(id);
+
+        if (user.getEmail().equals(currentEmailUser)){
+            throw new RuntimeException("You cannot delete your account");
+        }
+
+        ensureNotLastAdmin(user, "delete");
+
+        userRepository.deleteById(id);
+        return new MessageResponse("User deleted successfully.");
+
+    }
+
+    private void ensureNotLastAdmin(User user, String operation) {
+        if (user.getRole() == Role.ADMIN){
+            long adminCount = userRepository.countByRole(Role.ADMIN);
+            if (adminCount <= 1){
+                throw new RuntimeException("Cannot " + operation + " the last admin user.");
+            }
+        }
+
+    }
+
+    @Override
+    public MessageResponse toggleUserStatus(Long id, String currentUserEmail) {
+        User user = serviceUtils.getUserByIdOrThrow(id);
+
+        if (user.getEmail().equals(currentUserEmail)){
+            throw new RuntimeException("You cannot Deactivate your own account");
+        }
+
+        ensureNotLastActiveAdmin(user);
+
+        user.setActive(!user.isActive());
+        userRepository.save(user);
+        return new MessageResponse("User status updated successfully");
+    }
+
+    @Override
+    public MessageResponse changeUserRole(Long id, UserRequest userRequest) {
+        User user = serviceUtils.getUserByIdOrThrow(id);
+        validateRole(userRequest.getRole());
+
+        Role newRole = Role.valueOf(userRequest.getRole().toUpperCase());
+        if (user.getRole() == Role.ADMIN && newRole == Role.USER){
+            ensureNotLastAdmin(user, "change the role of");
+        }
+
+        user.setRole(newRole);
+        userRepository.save(user);
+        return new MessageResponse("User role updated successfully");
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

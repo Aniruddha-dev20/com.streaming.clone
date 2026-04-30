@@ -74,7 +74,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return User.builder()
                 .username(username)
                 .password("")
-                .authorities(Collections.singleton(new SimpleGrantedAuthority("ROLE"+role)))
+                .authorities(Collections.singleton(new SimpleGrantedAuthority("ROLE_"+role)))
                 .build();
     }
 
